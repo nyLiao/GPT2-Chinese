@@ -145,9 +145,11 @@ def main():
     if fp16:
         try:
             from apex import amp
+            from apex.optimizers import FP16_Optimizer
         except ImportError:
             raise ImportError("Please install apex from https://www.github.com/nvidia/apex to use fp16 training.")
         model, optimizer = amp.initialize(model, optimizer, opt_level=fp16_opt_level)
+        optimizer = FP16_Optimizer(optimizer, dynamic_loss_scale = True)
 
     if torch.cuda.device_count() > 1:
         print("Let's use", torch.cuda.device_count(), "GPUs!")
