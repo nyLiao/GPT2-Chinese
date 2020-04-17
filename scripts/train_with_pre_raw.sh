@@ -1,0 +1,14 @@
+python train.py \
+  --model_config model/prose_pretrain/config.json \
+  --tokenizer_path model/prose_pretrain/vocab.txt \
+  --tokenized_data_path data/tokenized/ \
+  --epochs 5 \
+  --lr 5.0e-5 \
+  --warmup_steps 1500 \
+  --log_step 100 \
+  --output_dir model/ \
+  --pretrained_model model/prose_pretrain/ \
+  --num_pieces 500 \
+  --batch_size 2 \
+  --raw_data_path data/train.json \
+  --raw

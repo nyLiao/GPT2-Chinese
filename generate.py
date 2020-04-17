@@ -130,8 +130,8 @@ def main():
     parser.add_argument('--temperature', default=1, type=float, required=False, help='生成温度')
     parser.add_argument('--topk', default=8, type=int, required=False, help='最高几选一')
     parser.add_argument('--topp', default=0, type=float, required=False, help='最高积累概率')
-    parser.add_argument('--model_config', default='config/model_config_small.json', type=str, required=False,
-                        help='模型参数')
+    # parser.add_argument('--model_config', default='config/model_config_small.json', type=str, required=False,
+    #                     help='模型参数')
     parser.add_argument('--tokenizer_path', default='cache/vocab_small.txt', type=str, required=False, help='词表路径')
     parser.add_argument('--model_path', default='model/final_model', type=str, required=False, help='模型路径')
     parser.add_argument('--prefix', default='萧炎', type=str, required=False, help='生成文章的开头')
@@ -193,13 +193,13 @@ def main():
                 for i, item in enumerate(text[:-1]):  # 确保英文前后有空格
                     if is_word(item) and is_word(text[i + 1]):
                         text[i] = item + ' '
-                for i, item in enumerate(text):
-                    if item == '[MASK]':
-                        text[i] = ''
-                    elif item == '[CLS]':
-                        text[i] = '\n\n'
-                    elif item == '[SEP]':
-                        text[i] = '\n'
+                # for i, item in enumerate(text):
+                #     if item == '[MASK]' or item == '[UNK]':
+                #         text[i] = ''
+                #     elif item == '[CLS]':
+                #         text[i] = '\n\n'
+                #     elif item == '[SEP]':
+                #         text[i] = '\n'
                 info = "=" * 40 + " SAMPLE " + str(generated) + " " + "=" * 40 + "\n"
                 print(info)
                 text = ''.join(text).replace('##', '').strip()

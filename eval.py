@@ -1,9 +1,9 @@
-import transformers
+from transformers.modeling_gpt2 import GPT2LMHeadModel
 import torch
 import os
-import json
+# import json
 import random
-import numpy as np
+# import numpy as np
 import argparse
 from datetime import datetime
 from tqdm import tqdm
@@ -53,6 +53,7 @@ def main():
     parser.add_argument('--min_length', default=128, type=int, required=False, help='最短收录文章长度')
     parser.add_argument('--pretrained_model', default='', type=str, required=False, help='模型起点路径')
     parser.add_argument('--output_dir', default='eval_result/', type=str, required=False, help='结果输出路径')
+    parser.add_argument('--output_name', default='result.txt', type=str, required=False, help='结果输出')
 
     args = parser.parse_args()
     print('args:\n' + args.__repr__())
@@ -64,10 +65,11 @@ def main():
 
     os.environ["CUDA_VISIBLE_DEVICES"] = args.device  # 此处设置程序使用哪些显卡
 
-    model_config = transformers.modeling_gpt2.GPT2Config.from_json_file(args.model_config)
-    print('config:\n' + model_config.to_json_string())
+    # model_config = transformers.modeling_gpt2.GPT2Config.from_json_file(args.model_config)
+    # print('config:\n' + model_config.to_json_string())
 
-    n_ctx = model_config.n_ctx
+    # n_ctx = model_config.n_ctx
+    n_ctx = 1024
     full_tokenizer = tokenization_bert.BertTokenizer(vocab_file=args.tokenizer_path)
     full_tokenizer.max_len = n_ctx
     device = 'cuda' if torch.cuda.is_available() else 'cpu'
@@ -92,11 +94,8 @@ def main():
                     full_tokenizer=full_tokenizer, min_length=min_length)
         print('files built')
 
-    if not args.pretrained_model:
-        print('you need to specify a trained model.')
-        exit(1)
-    else:
-        model = transformers.modeling_gpt2.GPT2LMHeadModel.from_pretrained(args.pretrained_model)
+    assert args.pretrained_model != '', AssertionError('you need to specify a trained model.')
+    model = GPT2LMHeadModel.from_pretrained(args.pretrained_model)
     model.eval()
     model.to(device)
 
@@ -107,11 +106,11 @@ def main():
     print('number of parameters: {}'.format(num_parameters))
 
     multi_gpu = False
-    full_len = 0
-    print('calculating total steps')
-    for i in tqdm(range(num_pieces)):
-        with open(tokenized_data_path + 'tokenized_train_{}.txt'.format(i), 'r') as f:
-            full_len += len([int(item) for item in f.read().strip().split()])
+    # full_len = 0
+    # print('calculating total steps')
+    # for i in tqdm(range(num_pieces)):
+    #     with open(tokenized_data_path + 'tokenized_train_{}.txt'.format(i), 'r') as f:
+    #         full_len += len([int(item) for item in f.read().strip().split()])
 
     if torch.cuda.device_count() > 1:
         print("Let's use", torch.cuda.device_count(), "GPUs!")
@@ -175,9 +174,8 @@ def main():
 
     if not os.path.exists(args.output_dir):
         os.mkdir(args.output_dir)
-    else:
-        with open(args.output_dir + 'result.txt', 'w') as f:
-            f.write(np.exp(total_loss / total_steps))
+    with open(args.output_dir + args.output_name, 'w') as f:
+        f.write(total_loss / total_steps)
 
 
 if __name__ == '__main__':

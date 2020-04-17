@@ -5,11 +5,11 @@ import json
 import random
 import numpy as np
 import argparse
-from torch.utils.tensorboard import SummaryWriter
+# from torch.utils.tensorboard import SummaryWriter
 from datetime import datetime
 from tqdm import tqdm
 from torch.nn import DataParallel
-from tokenizations.bpe_tokenizer import get_encoder
+# from tokenizations.bpe_tokenizer import get_encoder
 
 
 def build_files(data_path, tokenized_data_path, num_pieces, full_tokenizer, min_length):
@@ -24,8 +24,7 @@ def build_files(data_path, tokenized_data_path, num_pieces, full_tokenizer, min_
         sublines = lines[all_len // num_pieces * i: all_len // num_pieces * (i + 1)]
         if i == num_pieces - 1:
             sublines.extend(lines[all_len // num_pieces * (i + 1):])  # 把尾部例子添加到最后一个piece
-        sublines = [full_tokenizer.tokenize(line) for line in sublines if
-                    len(line) > min_length]  # 只考虑长度超过min_length的句子
+        sublines = [full_tokenizer.tokenize(line) for line in sublines if len(line) > min_length]  # 只考虑长度超过min_length的句子
         sublines = [full_tokenizer.convert_tokens_to_ids(line) for line in sublines]
         full_line = []
         for subline in sublines:
@@ -62,11 +61,11 @@ def main():
     parser.add_argument('--min_length', default=128, type=int, required=False, help='最短收录文章长度')
     parser.add_argument('--output_dir', default='model/', type=str, required=False, help='模型输出路径')
     parser.add_argument('--pretrained_model', default='', type=str, required=False, help='模型训练起点路径')
-    parser.add_argument('--writer_dir', default='tensorboard_summary/', type=str, required=False, help='Tensorboard路径')
+    # parser.add_argument('--writer_dir', default='tensorboard_summary/', type=str, required=False, help='Tensorboard路径')
     parser.add_argument('--segment', action='store_true', help='中文以词为单位')
-    parser.add_argument('--bpe_token', action='store_true', help='subword')
-    parser.add_argument('--encoder_json', default="tokenizations/encoder.json", type=str, help="encoder.json")
-    parser.add_argument('--vocab_bpe', default="tokenizations/vocab.bpe", type=str, help="vocab.bpe")
+    # parser.add_argument('--bpe_token', action='store_true', help='subword 使用BPE Tokenizer')
+    # parser.add_argument('--encoder_json', default="tokenizations/encoder.json", type=str, help="encoder.json")
+    # parser.add_argument('--vocab_bpe', default="tokenizations/vocab.bpe", type=str, help="vocab.bpe")
 
     args = parser.parse_args()
     print('args:\n' + args.__repr__())
@@ -82,10 +81,11 @@ def main():
     print('config:\n' + model_config.to_json_string())
 
     n_ctx = model_config.n_ctx
-    if args.bpe_token:
-        full_tokenizer = get_encoder(args.encoder_json, args.vocab_bpe)
-    else:
-        full_tokenizer = tokenization_bert.BertTokenizer(vocab_file=args.tokenizer_path)
+    # if args.bpe_token:
+    #     full_tokenizer = get_encoder(args.encoder_json, args.vocab_bpe)
+    # else:
+    #     full_tokenizer = tokenization_bert.BertTokenizer(vocab_file=args.tokenizer_path)
+    full_tokenizer = tokenization_bert.BertTokenizer(vocab_file=args.tokenizer_path)
     full_tokenizer.max_len = 999999
     device = 'cuda' if torch.cuda.is_available() else 'cpu'
     print('using device:', device)
@@ -106,7 +106,7 @@ def main():
     num_pieces = args.num_pieces
     min_length = args.min_length
     output_dir = args.output_dir
-    tb_writer = SummaryWriter(log_dir=args.writer_dir)
+    # tb_writer = SummaryWriter(log_dir=args.writer_dir)
     assert log_step % gradient_accumulation == 0
 
     if not os.path.exists(output_dir):
@@ -189,6 +189,7 @@ def main():
 
                 #  forward pass
                 outputs = model.forward(input_ids=batch_inputs, labels=batch_inputs)
+                # outputs = model(input_ids=batch_inputs, labels=batch_inputs)
                 loss, logits = outputs[:2]
 
                 #  get loss
@@ -207,13 +208,13 @@ def main():
                     torch.nn.utils.clip_grad_norm_(model.parameters(), max_grad_norm)
 
                 #  optimizer step
+                running_loss += loss.item()
                 if (overall_step + 1) % gradient_accumulation == 0:
-                    running_loss += loss.item()
                     optimizer.step()
                     optimizer.zero_grad()
                     scheduler.step()
                 if (overall_step + 1) % log_step == 0:
-                    tb_writer.add_scalar('loss', loss.item() * gradient_accumulation, overall_step)
+                    # tb_writer.add_scalar('loss', loss.item() * gradient_accumulation, overall_step)
                     print('now time: {}:{}. Step {} of piece {} of epoch {}, loss {}'.format(
                         datetime.now().hour,
                         datetime.now().minute,
