@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 # Class for for generating paragraph texts from inputs.
 #
-# by nyLiao, 2019
+# by nyLiao, 2020
 
 # import os
 # import argparse
