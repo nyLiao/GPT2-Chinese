@@ -5,7 +5,6 @@
 
 # import os
 # import argparse
-# from tqdm import trange
 # import time
 from random import randint
 
@@ -50,10 +49,51 @@ def top_k_top_p_filtering(logits, top_k=0, top_p=0.0, filter_value=-float('Inf')
     return logits
 
 
+def gen_paragraph(model, prev, past, length, topk, topp, temperature, verbose=0):
+    """Generate single paragraph with exception handling
+    params:
+        model: transformers model
+        prev: current input ids
+        past: model past status
+        length: paragraph length
+        topk, topp: see `top_k_top_p_filtering`
+        temperature: temperature of generating freedom
+        verbose: 0-none, 1-tqdm, 2-stdout
+    return:
+        generate: generated ids
+        past: updated model past
+    """
+    generate = []
+    with torch.no_grad():
+        if verbose == 1:
+            from tqdm import trange
+            iter = trange(length)
+        else:
+            iter = range(length)
+
+        for i in iter:
+            if verbose == 2:
+                print(str(int(i / length * 100)) + "=i", end='')
+            try:
+                output = model(prev, past=past)
+                output, past = output[:2]
+                output = output[-1].squeeze(0) / temperature
+                filtered_logits = top_k_top_p_filtering(output, top_k=topk, top_p=topp)
+                next_token = torch.multinomial(torch.softmax(filtered_logits, dim=-1), num_samples=1)
+                generate.append(next_token.item())
+            except Exception:
+                # Some past states cause predict index out of range
+                next_token = torch.tensor(randint(200, 7000))  # or 4638
+                past = None
+                # raise e
+            prev = next_token.view(1, 1)
+    return generate, past
+
+
 class genModel(object):
     """API Class for generating texts."""
 
-    def __init__(self, model_path=MODEL7_PATH, tokenizer_path=TOKEN7_PATH):
+    def __init__(self, model_path=MODEL7_PATH, tokenizer_path=TOKEN7_PATH, verbose=0):
         """Init model with given path."""
         super(genModel, self).__init__()
 
@@ -65,9 +105,29 @@ class genModel(object):
 
         self.n_ctx = self.model.config.n_ctx
         self.past = None             # pre-computed hidden-states
+        self.verbose = verbose
 
     def clear(self):
         self.past = None
+
+    def post_process(self, para_word):
+        last_end = -1
+        for i, item in enumerate(para_word):
+            # Find where to end
+            if item in ['[SEP]', '[CLS]', '。', '，', '；', '.']:
+                last_end = i
+            # Replace words
+            if item == '[MASK]' or item == '[UNK]':
+                para_word[i] = '[]'
+            elif item == '[CLS]':
+                para_word[i] = '\n'
+            elif item == '[SEP]':
+                para_word[i] = ''
+
+        # End paragraph at last_end
+        para_word[last_end] = '。'
+        para_text = ''.join(para_word[:last_end+1]).strip()
+        return para_text
 
     def gen_ph(self, inputs="", length=100, topk=4, topp=1, temperature=1.5):
         """Generate a paragraph with input beginning and params.
@@ -79,52 +139,6 @@ class genModel(object):
             Retrun:
                 para_text: generated text string
         """
-        def gen_paragraph(model, contex, contex_past, device, length, topk, topp, temperature):
-            prev, past = contex, contex_past
-            generate = []
-            with torch.no_grad():
-                for i in range(length):
-                    print(str(int(i / length * 100)) + "=i", end='')
-                    try:
-                        output = model(prev, past=past)
-                        output, past = output[:2]
-                        output = output[-1].squeeze(0) / temperature
-                        filtered_logits = top_k_top_p_filtering(output, top_k=topk, top_p=topp)
-                        next_token = torch.multinomial(torch.softmax(filtered_logits, dim=-1), num_samples=1)
-                        generate.append(next_token.item())
-                    except Exception as e:
-                        # Some past states cause predict index out of range
-                        next_token = torch.tensor(randint(200, 7000))  # or 4638
-                        past = None
-                        # raise e
-                    prev = next_token.view(1, 1)
-            return generate, past
-
-        def post_process(para_word):
-            last_end = -1
-            for i, item in enumerate(para_word):
-                # Find where to end
-                if item in ['[SEP]', '[CLS]', '。', '，', '；', '.']:
-                    last_end = i
-                # Replace words
-                if item == '[MASK]' or item == '[UNK]':
-                    para_word[i] = '[]'
-                elif item == '[CLS]':
-                    para_word[i] = '\n'
-                elif item == '[SEP]':
-                    para_word[i] = ''
-
-            # End paragraph at last_end
-            para_word[last_end] = '。'
-            para_text = ''.join(para_word[:last_end+1]).strip()
-            return para_text
-
-        # print(length, temperature, topk, topp)
-        # for i in range(300):
-        #     print(str(int(i / 300 * 100)) + "=i", end='')
-        #     time.sleep(0.01)
-        # return "test"
-        # -----
         # Data pre-processing
         length = length if length > 0 else self.n_ctx
         if inputs == "":        # as text beginning
@@ -142,11 +156,11 @@ class genModel(object):
 
         # Generate and process to chars
         generate, self.past = gen_paragraph(self.model, prev, self.past,
-            device=self.device, length=length,
-            topk=topk, topp=topp, temperature=temperature)
+            length=length, topk=topk, topp=topp,
+            temperature=temperature, verbose=self.verbose)
         para_tokens += generate
         para_word = self.tokenizer.convert_ids_to_tokens(para_tokens)
-        para_text = post_process(para_word)
+        para_text = self.post_process(para_word)
         return para_text
 
 
